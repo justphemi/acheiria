@@ -1,0 +1,143 @@
+name: Build All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install flet pyperclip pynput pyinstaller
+          brew install create-dmg
+      
+      - name: Build macOS
+        run: pyinstaller --clean --noconfirm build-macos.spec
+      
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "Acheiria Installer" \
+            --volicon "assets/logo.icns" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 160 \
+            --icon "Acheiria.app" 180 170 \
+            --app-drop-link 480 170 \
+            "Acheiria-macOS.dmg" \
+            "dist/Acheiria.app"
+      
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-dmg
+          path: Acheiria-macOS.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install flet pyperclip pynput pyinstaller
+      
+      - name: Build Windows
+        run: pyinstaller --clean --noconfirm build-windows.spec
+      
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-exe
+          path: dist/Acheiria.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk libxcb-cursor0
+          pip install flet pyperclip pynput pyinstaller
+      
+      - name: Build Linux
+        run: pyinstaller --clean --noconfirm build-linux.spec
+      
+      - name: Create AppImage
+        run: |
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          
+          mkdir -p Acheiria.AppDir/usr/bin
+          mkdir -p Acheiria.AppDir/usr/share/icons/hicolor/256x256/apps
+          
+          cp dist/Acheiria Acheiria.AppDir/usr/bin/
+          cp assets/logo.png Acheiria.AppDir/usr/share/icons/hicolor/256x256/apps/acheiria.png
+          
+          cat > Acheiria.AppDir/AppRun << 'APPRUN'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          exec "${HERE}/usr/bin/Acheiria" "$@"
+          APPRUN
+          chmod +x Acheiria.AppDir/AppRun
+          
+          cat > Acheiria.AppDir/acheiria.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=Acheiria
+          Exec=Acheiria
+          Icon=acheiria
+          Type=Application
+          Categories=Utility;
+          DESKTOP
+          
+          ./appimagetool-x86_64.AppImage Acheiria.AppDir Acheiria-Linux.AppImage
+      
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-appimage
+          path: Acheiria-Linux.AppImage
+
+  create-release:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            macos-dmg/Acheiria-macOS.dmg
+            windows-exe/Acheiria.exe
+            linux-appimage/Acheiria-Linux.AppImage
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
