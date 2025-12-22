@@ -1,16 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
 block_cipher = None
 
+# Get the absolute path to the project root
+project_root = os.path.abspath(SPECPATH)
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[project_root],
     binaries=[],
     datas=[
-        ('app', 'app'),
-        ('assets', 'assets'),
+        ('app/*.py', 'app'),
+        ('assets/*', 'assets'),
     ],
     hiddenimports=[
+        'flet',
+        'flet.core',
+        'flet.utils',
         'pynput.keyboard._xorg',
         'pynput.mouse._xorg',
     ],
@@ -33,7 +40,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='acheiria',
+    name='Acheiria',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

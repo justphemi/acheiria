@@ -1,16 +1,24 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+from pathlib import Path
 
 block_cipher = None
 
+# Get the absolute path to the project root
+project_root = os.path.abspath(SPECPATH)
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[project_root],
     binaries=[],
     datas=[
-        ('app', 'app'),
-        ('assets', 'assets'),
+        ('app/*.py', 'app'),
+        ('assets/*', 'assets'),
     ],
     hiddenimports=[
+        'flet',
+        'flet.core',
+        'flet.utils',
         'pynput.keyboard._darwin',
         'pynput.mouse._darwin',
     ],
@@ -31,7 +39,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='acheiria',
+    name='Acheiria',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -50,13 +58,16 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='acheiria',
+    name='Acheiria',
 )
+
+# Check if icon exists, use default if not
+icon_path = 'assets/logo.icns' if os.path.exists('assets/logo.icns') else None
 
 app = BUNDLE(
     coll,
-    name='acheiria.app',
-    icon='assets/logo.icns',
+    name='Acheiria.app',
+    icon=icon_path,
     bundle_identifier='com.acheiria.typingassistant',
     version='1.0.0',
     info_plist={
@@ -64,8 +75,8 @@ app = BUNDLE(
         'LSMinimumSystemVersion': '10.13.0',
         'CFBundleShortVersionString': '1.0.0',
         'CFBundleVersion': '1.0.0',
-        'CFBundleDisplayName': 'acheiria',
-        'NSHumanReadableCopyright': 'Copyright © 2024 acheiria',
+        'CFBundleDisplayName': 'Acheiria',
+        'NSHumanReadableCopyright': 'Copyright © 2024 Acheiria',
         'LSApplicationCategoryType': 'public.app-category.productivity',
     },
 )

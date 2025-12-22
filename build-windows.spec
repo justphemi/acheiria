@@ -1,16 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
 block_cipher = None
 
+# Get the absolute path to the project root
+project_root = os.path.abspath(SPECPATH)
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=[project_root],
     binaries=[],
     datas=[
-        ('app', 'app'),
-        ('assets', 'assets'),
+        ('app/*.py', 'app'),
+        ('assets/*', 'assets'),
     ],
     hiddenimports=[
+        'flet',
+        'flet.core',
+        'flet.utils',
         'pynput.keyboard._win32',
         'pynput.mouse._win32',
     ],
@@ -26,6 +33,9 @@ a = Analysis(
 
 pyo = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Check if icon exists
+icon_path = 'assets/logo.ico' if os.path.exists('assets/logo.ico') else None
+
 exe = EXE(
     pyo,
     a.scripts,
@@ -33,7 +43,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='acheiria',
+    name='Acheiria',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -45,5 +55,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/logo.ico',
+    icon=icon_path,
 )
