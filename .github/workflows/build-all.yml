@@ -22,23 +22,8 @@ jobs:
           pip install flet pyperclip pynput pyinstaller
           brew install create-dmg
       
-      - name: Verify project structure
-        run: |
-          echo "=== Project Structure ==="
-          ls -la
-          echo "=== App Directory ==="
-          ls -la app/ || echo "app/ directory not found!"
-          echo "=== Assets Directory ==="
-          ls -la assets/ || echo "assets/ directory not found!"
-          echo "=== Main.py exists? ==="
-          ls -la main.py || echo "main.py not found!"
-      
       - name: Build macOS
-        run: |
-          echo "Starting PyInstaller build..."
-          pyinstaller --clean --noconfirm build-macos.spec
-          echo "Build complete, checking output..."
-          ls -la dist/
+        run: pyinstaller --clean --noconfirm build-macos.spec
       
       - name: Create DMG
         run: |
@@ -51,7 +36,7 @@ jobs:
             --icon "Acheiria.app" 180 170 \
             --app-drop-link 480 170 \
             "Acheiria-macOS.dmg" \
-            "dist/Acheiria.app" || echo "DMG creation failed, but continuing..."
+            "dist/Acheiria.app" || echo "DMG creation failed"
       
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
@@ -70,28 +55,11 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Verify project structure
-        run: |
-          echo "=== Project Structure ==="
-          dir
-          echo "=== App Directory ==="
-          dir app
-          echo "=== Assets Directory ==="
-          dir assets
-          echo "=== Main.py exists? ==="
-          dir main.py
-        shell: cmd
-      
       - name: Install dependencies
         run: pip install flet pyperclip pynput pyinstaller
       
       - name: Build Windows
-        run: |
-          echo "Starting PyInstaller build..."
-          pyinstaller --clean --noconfirm build-windows.spec
-          echo "Build complete, checking output..."
-          dir dist
-        shell: cmd
+        run: pyinstaller --clean --noconfirm build-windows.spec
       
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
@@ -113,64 +81,106 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk libxcb-cursor0
+          sudo apt-get install -y python3-tk libxcb-cursor0 libfuse2 file
           pip install flet pyperclip pynput pyinstaller
       
-      - name: Verify project structure
-        run: |
-          echo "=== Project Structure ==="
-          ls -la
-          echo "=== App Directory ==="
-          ls -la app/ || echo "app/ directory not found!"
-          echo "=== Assets Directory ==="
-          ls -la assets/ || echo "assets/ directory not found!"
-          echo "=== Main.py exists? ==="
-          ls -la main.py || echo "main.py not found!"
-      
       - name: Build Linux
+        run: pyinstaller --clean --noconfirm build-linux.spec
+      
+      - name: Download appimagetool with retry
         run: |
-          echo "Starting PyInstaller build..."
-          pyinstaller --clean --noconfirm build-linux.spec
-          echo "Build complete, checking output..."
-          ls -la dist/
+          # Try multiple mirrors with retries
+          for i in {1..3}; do
+            echo "Attempt $i to download appimagetool..."
+            
+            # Try official GitHub release first
+            if wget -q --timeout=30 --tries=3 \
+              https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage; then
+              echo "Downloaded from GitHub successfully"
+              break
+            fi
+            
+            # Try alternative: specific version
+            if wget -q --timeout=30 --tries=3 \
+              https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage; then
+              echo "Downloaded from GitHub (v13) successfully"
+              break
+            fi
+            
+            # Last resort: use AppImageHub mirror
+            if wget -q --timeout=30 --tries=3 \
+              "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" \
+              -O appimagetool-x86_64.AppImage; then
+              echo "Downloaded successfully"
+              break
+            fi
+            
+            echo "Download failed, waiting before retry..."
+            sleep 10
+          done
+          
+          # Verify we have the file
+          if [ ! -f appimagetool-x86_64.AppImage ]; then
+            echo "Failed to download appimagetool after all attempts"
+            exit 1
+          fi
+          
+          chmod +x appimagetool-x86_64.AppImage
+          echo "appimagetool ready"
       
       - name: Create AppImage
         run: |
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          
           mkdir -p Acheiria.AppDir/usr/bin
           mkdir -p Acheiria.AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p Acheiria.AppDir/usr/share/applications
           
+          # Copy binary
           cp dist/Acheiria Acheiria.AppDir/usr/bin/
-          cp assets/logo.png Acheiria.AppDir/usr/share/icons/hicolor/256x256/apps/acheiria.png
           
+          # Copy icon
+          cp assets/logo.png Acheiria.AppDir/usr/share/icons/hicolor/256x256/apps/acheiria.png
+          cp assets/logo.png Acheiria.AppDir/acheiria.png
+          
+          # Create AppRun
           cat > Acheiria.AppDir/AppRun << 'APPRUN'
           #!/bin/bash
           SELF=$(readlink -f "$0")
           HERE=${SELF%/*}
           export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
           exec "${HERE}/usr/bin/Acheiria" "$@"
           APPRUN
           chmod +x Acheiria.AppDir/AppRun
           
+          # Create .desktop file
           cat > Acheiria.AppDir/acheiria.desktop << 'DESKTOP'
           [Desktop Entry]
           Name=Acheiria
           Exec=Acheiria
           Icon=acheiria
           Type=Application
-          Categories=Utility;
+          Categories=Utility;Accessibility;
+          Terminal=false
           DESKTOP
           
-          ./appimagetool-x86_64.AppImage Acheiria.AppDir Acheiria-Linux.AppImage || echo "AppImage creation failed, but continuing..."
+          # Build AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage Acheiria.AppDir Acheiria-Linux.AppImage
+          
+          # Verify it was created
+          if [ -f Acheiria-Linux.AppImage ]; then
+            echo "AppImage created successfully"
+            ls -lh Acheiria-Linux.AppImage
+          else
+            echo "Failed to create AppImage"
+            exit 1
+          fi
       
       - name: Upload Linux AppImage
         uses: actions/upload-artifact@v4
         with:
           name: linux-appimage
           path: Acheiria-Linux.AppImage
-          if-no-files-found: warn
+          if-no-files-found: error
 
   create-release:
     needs: [build-macos, build-windows, build-linux]
@@ -179,6 +189,12 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
+      
+      - name: List downloaded artifacts
+        run: |
+          echo "=== Downloaded Artifacts ==="
+          ls -la
+          find . -type f -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage"
       
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -189,5 +205,19 @@ jobs:
             linux-appimage/Acheiria-Linux.AppImage
           draft: false
           prerelease: false
+          body: |
+            ## Acheiria v${{ github.ref_name }}
+            
+            ### Downloads
+            - **macOS**: Acheiria-macOS.dmg (Intel & Apple Silicon)
+            - **Windows**: Acheiria.exe
+            - **Linux**: Acheiria-Linux.AppImage
+            
+            ### Installation
+            - **macOS**: Open the DMG and drag Acheiria to Applications
+            - **Windows**: Run the .exe file
+            - **Linux**: Make executable with `chmod +x Acheiria-Linux.AppImage` and run
+            
+            Built automatically via GitHub Actions.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
