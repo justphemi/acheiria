@@ -1,0 +1,27 @@
+# acheiria Dependencies
+# Compatible with Python 3.14
+
+# UI Framework
+flet==0.25.2
+
+# AI Integration
+google-generativeai==0.8.3
+
+# Typing Simulation
+pyautogui==0.9.54
+pynput==1.7.7
+
+# Clipboard Management
+pyperclip==1.9.0
+
+# Image Processing (for icons)
+Pillow==11.0.0
+
+# HTTP Requests (for API calls)
+requests==2.32.3
+
+# JSON handling (built-in, listed for reference)
+# json (built-in)
+
+# Async support
+aiohttp==3.11.10
