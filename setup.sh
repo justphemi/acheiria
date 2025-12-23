@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# acheiria Setup Script for macOS
-# This script sets up your Mac for building and running acheiria
+# Acheiria Setup Script for macOS
+# This script sets up your Mac for building and running Acheiria
 
 echo "======================================"
-echo "   acheiria Setup for macOS"
+echo "   Acheiria Setup for macOS"
 echo "======================================"
 echo ""
 

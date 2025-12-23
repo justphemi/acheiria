@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Acheiria - Typing Assistant
+Acheiria - acheiria: nuturing laziness in youths
 """
 
 import flet as ft
@@ -9,6 +9,9 @@ import logging
 import time
 import threading
 from pathlib import Path
+
+
+
 
 # Get user's home directory for logs (writable in bundled apps)
 if getattr(sys, 'frozen', False):
@@ -19,6 +22,7 @@ if getattr(sys, 'frozen', False):
 else:
     # Running as script
     log_file = Path('acheiria.log')
+
 
 # Configure logging
 logging.basicConfig(
@@ -31,7 +35,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logger.info("="*50)
-logger.info("Acheiria Typing Assistant Starting")
+logger.info("acheiria acheiria: nuturing laziness in youths is starting")
 logger.info(f"Log file: {log_file}")
 logger.info("="*50)
 
@@ -49,7 +53,7 @@ def main(page: ft.Page):
         config = config_manager.load_config()
         
         # Configure the main window
-        page.title = "Acheiria Typing Assistant"
+        page.title = "acheiria: nuturing laziness in youths"
         page.window.width = 580
         page.window.height = 520
         page.window.resizable = True
@@ -110,7 +114,7 @@ def main(page: ft.Page):
         # Update the page
         page.update()
         
-        logger.info("Acheiria Typing Assistant started successfully")
+        logger.info("Acheiria acheiria: nuturing laziness in youths started successfully")
         
     except Exception as e:
         logger.error(f"Error starting application: {e}", exc_info=True)

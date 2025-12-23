@@ -1,4 +1,9 @@
 import flet as ft
+try:
+    from flet.control import UserControl
+except ImportError:
+    # For older versions of Flet
+    UserControl = ft.UserControl
 import logging
 import pyperclip
 import time
@@ -18,7 +23,7 @@ except ImportError:
     HAS_PYNPUT = False
     logger.error("pynput not installed")
 
-class AcheiriaApp(ft.UserControl):
+class AcheiriaApp(UserControl):
     """Main application UI - Black & Oxblood Theme"""
     
     def __init__(self, page: ft.Page, config_manager):
