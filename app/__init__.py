@@ -1,10 +1,10 @@
 __version__ = "1.0.0"
-__author__ = "acheiria"
+__author__ = "phemi"
 
 from app.config import ConfigManager
-from app.ui import acheiriaApp
+from app.ui import AcheiriaApp
 
 __all__ = [
     'ConfigManager',
-    'acheiriaApp',
+    'AcheiriaApp',
 ]

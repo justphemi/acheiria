@@ -9,7 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Import pynput for keyboard control
+# Import pynput for keyboard control 
 try:
     from pynput import keyboard
     HAS_PYNPUT = True
@@ -18,7 +18,7 @@ except ImportError:
     HAS_PYNPUT = False
     logger.error("pynput not installed")
 
-class acheiriaApp(ft.UserControl):
+class AcheiriaApp(ft.UserControl):
     """Main application UI - Black & Oxblood Theme"""
     
     def __init__(self, page: ft.Page, config_manager):

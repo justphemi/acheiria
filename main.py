@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-acheiria - Typing Assistant
+Acheiria - Typing Assistant
 """
 
 import flet as ft
@@ -10,19 +10,33 @@ import time
 import threading
 from pathlib import Path
 
+# Get user's home directory for logs (writable in bundled apps)
+if getattr(sys, 'frozen', False):
+    # Running as bundled app
+    log_dir = Path.home() / '.acheiria'
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / 'acheiria.log'
+else:
+    # Running as script
+    log_file = Path('acheiria.log')
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('acheiria.log'),
+        logging.FileHandler(str(log_file)),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
+logger.info("="*50)
+logger.info("Acheiria Typing Assistant Starting")
+logger.info(f"Log file: {log_file}")
+logger.info("="*50)
 
 # Import our app module
-from app.ui import acheiriaApp
+from app.ui import AcheiriaApp
 from app.config import ConfigManager
 
 def main(page: ft.Page):
@@ -35,17 +49,23 @@ def main(page: ft.Page):
         config = config_manager.load_config()
         
         # Configure the main window
-        page.title = "acheiria: nuturing laziness in youths"
-        page.window.width = 600
-        page.window.height = 400
+        page.title = "Acheiria Typing Assistant"
+        page.window.width = 580
+        page.window.height = 520
         page.window.resizable = True
         page.window.minimizable = True
         page.window.maximizable = True
         page.padding = 0
         page.spacing = 0
-        page.bgcolor = "#1E1E1E"
+        page.bgcolor = "#000000"
         page.window.title_bar_hidden = False
         page.window.frameless = False
+        
+        # Set window constraints
+        page.window.min_width = 500
+        page.window.max_width = 900
+        page.window.min_height = 480
+        page.window.max_height = 900
         
         # Set window position and always on top from config
         if not config.get('first_run', False):
@@ -56,7 +76,7 @@ def main(page: ft.Page):
         page.window.always_on_top = config.get('always_on_top', True)
         
         # Initialize and add the main app UI
-        app = acheiriaApp(page, config_manager)
+        app = AcheiriaApp(page, config_manager)
         page.add(app)
         
         # Save window position on move
@@ -90,7 +110,7 @@ def main(page: ft.Page):
         # Update the page
         page.update()
         
-        logger.info("acheiria: nuturing laziness in youths started successfully")
+        logger.info("Acheiria Typing Assistant started successfully")
         
     except Exception as e:
         logger.error(f"Error starting application: {e}", exc_info=True)
