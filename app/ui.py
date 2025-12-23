@@ -1,14 +1,10 @@
 import flet as ft
-try:
-    from flet.control import UserControl
-except ImportError:
-    # For older versions of Flet
-    UserControl = ft.UserControl
 import logging
 import pyperclip
 import time
 import threading
 import platform
+import asyncio
 from typing import Dict, Any
 from pathlib import Path
 
@@ -23,8 +19,8 @@ except ImportError:
     HAS_PYNPUT = False
     logger.error("pynput not installed")
 
-class AcheiriaApp(UserControl):
-    """Main application UI - Black & Oxblood Theme"""
+class AcheiriaApp(ft.Column):
+    """Main application UI - Black & Oxblood Theme - NEW Flet API"""
     
     def __init__(self, page: ft.Page, config_manager):
         super().__init__()
@@ -68,100 +64,15 @@ class AcheiriaApp(UserControl):
         
         # Window state
         self.window_initialized = False
+        
+        # Build the UI immediately (new API)
+        self._build_ui()
+        
+        # Initialize
+        self.did_mount()
     
-    def did_mount(self):
-        """Initialize window and check permissions"""
-        self._check_and_request_permissions()
-        # Set initial window size without auto-centering
-        self._calculate_window_size(initial=True)
-        self.window_initialized = True
-    
-    def _check_and_request_permissions(self):
-        """Check and request accessibility permissions on macOS"""
-        if self.os_type == "Darwin" and HAS_PYNPUT:
-            try:
-                # Test if we can use keyboard
-                test = keyboard.Controller()
-                test.press(keyboard.Key.shift)
-                test.release(keyboard.Key.shift)
-                logger.info("accessibility permissions granted")
-            except Exception as e:
-                logger.warning(f"accessibility permissions needed: {e}")
-                # Show permission dialog
-                self.page.run_thread(self._show_permission_dialog)
-    
-    def _show_permission_dialog(self):
-        """Show dialog requesting accessibility permissions"""
-        if self.os_type == "Darwin":
-            import subprocess
-            
-            def open_settings(e):
-                subprocess.run(['open', 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'])
-                dlg.open = False
-                self.page.update()
-            
-            dlg = ft.AlertDialog(
-                modal=True,
-                title=ft.Text("accessibility permission required", weight=ft.FontWeight.BOLD, color=self.text_color),
-                content=ft.Column([
-                    ft.Text("acheiria needs accessibility permissions to type on your behalf.", size=13, color=self.text_color),
-                    ft.Text("\n1. click 'open settings' below", size=12, color=self.text_color),
-                    ft.Text("2. find and enable this app", size=12, color=self.text_color),
-                    ft.Text("3. restart acheiria", size=12, color=self.text_color),
-                ], tight=True, spacing=8),
-                bgcolor=self.card_bg,
-                actions=[
-                    ft.TextButton("cancel", on_click=lambda e: setattr(dlg, 'open', False) or self.page.update()),
-                    ft.ElevatedButton("open settings", on_click=open_settings, bgcolor=self.oxblood, color=self.text_color),
-                ],
-                actions_alignment=ft.MainAxisAlignment.END,
-            )
-            self.page.dialog = dlg
-            dlg.open = True
-            self.page.update()
-    
-    def _calculate_window_size(self, initial=False):
-        """Calculate optimal window size based on content without auto-positioning"""
-        # Base height for fixed elements (reduced for 3-line text area)
-        base_height = 318  # Header, buttons, settings, timer, progress
-        
-        # Text area height (3 lines max with scrollbar)
-        line_height = 20  # Approximate height per line
-        text_lines = len(self.text_input.value.split('\n')) if self.text_input.value else 1
-        visible_lines = min(3, text_lines)  # Changed from 8 to 3
-        text_area_height = visible_lines * line_height + 25  # +25 for padding and scrollbar
-        
-        # Add scrollbar height if needed
-        if text_lines > 3:  # Changed from 8 to 3
-            text_area_height += 15  # Reduced scrollbar space
-        
-        # Calculate total height
-        total_height = base_height + text_area_height
-        
-        # Set window size without repositioning
-        if initial:
-            # Only set initial size, don't center
-            self.page.window.width = 600
-            self.page.window.height = max(350, min(600, total_height))  # Reduced max height
-        else:
-            # Just update height to fit content, keep width and position
-            self.page.window.height = max(350, min(600, total_height))  # Reduced max height
-        
-        # Set minimum window size
-        self.page.window.min_width = 500
-        self.page.window.min_height = 350  # Reduced minimum height
-        
-        # Make resizable
-        self.page.window.resizable = True
-        
-        # Don't auto-position the window after initial setup
-        if not self.window_initialized:
-            self.window_initialized = True
-        
-        self.page.update()
-    
-    def build(self):
-        """Build UI with Black & Oxblood theme"""
+    def _build_ui(self):
+        """Build UI with Black & Oxblood theme - NEW API"""
         
         # Warning banner if pynput missing
         self.warning_banner = ft.Container(
@@ -183,7 +94,7 @@ class AcheiriaApp(UserControl):
             hint_style=ft.TextStyle(color="#666666"),
             multiline=True,
             min_lines=1,
-            max_lines=3,  # Maximum 3 lines visible (changed from 8)
+            max_lines=3,
             border_color=self.oxblood_dark,
             focused_border_color=self.oxblood,
             text_style=ft.TextStyle(color=self.text_color, font_family="Courier New", size=13),
@@ -202,7 +113,7 @@ class AcheiriaApp(UserControl):
                     content=self.text_input,
                     expand=True,
                 )
-            ], scroll=ft.ScrollMode.AUTO),  # Enable vertical scrolling
+            ], scroll=ft.ScrollMode.AUTO),
             expand=True,
             padding=10,
         )
@@ -263,13 +174,13 @@ class AcheiriaApp(UserControl):
         speed_val = self.config.get('typing_speed', 60)
         
         # Clamp values to slider ranges
-        countdown_val = max(3, min(10, countdown_val))  # Between 3 and 10
-        speed_val = max(50, min(1000, speed_val))  # Between 50 and 1000
+        countdown_val = max(3, min(10, countdown_val))
+        speed_val = max(50, min(1000, speed_val))
         
-        # Sliders with oxblood theme - use clamped values
+        # Sliders with oxblood theme
         self.countdown_slider = ft.Slider(
             min=3, max=10, divisions=7,
-            value=countdown_val,  # Use clamped value
+            value=countdown_val,
             label="{value}s",
             on_change=self.update_countdown_setting,
             active_color=self.oxblood,
@@ -279,16 +190,15 @@ class AcheiriaApp(UserControl):
         )
         
         self.speed_slider = ft.Slider(
-                min=50, max=1000, divisions=150,
-                value=speed_val,  # Use clamped value
-                label="{value}",
-                on_change=self.update_speed_setting,
-                active_color=self.oxblood,
-                inactive_color=self.oxblood_dark,
-                thumb_color=self.oxblood_light,
-                expand=True,
-            )
-            
+            min=50, max=1000, divisions=150,
+            value=speed_val,
+            label="{value}",
+            on_change=self.update_speed_setting,
+            active_color=self.oxblood,
+            inactive_color=self.oxblood_dark,
+            thumb_color=self.oxblood_light,
+            expand=True,
+        )
         
         self.always_on_top_switch = ft.Switch(
             value=self.config.get('always_on_top', True),
@@ -306,11 +216,11 @@ class AcheiriaApp(UserControl):
             visible=False,
         )
         
-        # Status texts - all lowercase
+        # Status texts
         self.progress_text = ft.Text("ready", color=self.text_color, size=11)
         self.status_text = ft.Text("you lazy thing", color=self.oxblood_light, size=10, italic=True)
         
-        # Timer displays - all lowercase
+        # Timer displays
         self.elapsed_time_text = ft.Text("", color=self.oxblood, size=10, weight=ft.FontWeight.BOLD)
         self.estimated_time_text = ft.Text("", color=self.oxblood_light, size=10)
         
@@ -390,7 +300,7 @@ class AcheiriaApp(UserControl):
                     padding=ft.padding.only(left=10, right=10, bottom=5),
                 ),
                 
-                # Timer area - text only
+                # Timer area
                 ft.Container(
                     content=ft.Row([
                         self.elapsed_time_text,
@@ -403,14 +313,33 @@ class AcheiriaApp(UserControl):
             ], spacing=0),
         )
         
-        # Full UI with black background
-        return ft.Container(
-            content=ft.Column([
-                self.header,
-                self.main_content,
-            ], spacing=0),
-            bgcolor=self.bg_color,  # Black background
-        )
+        # Set the controls for the Column (self)
+        self.controls = [
+            ft.Container(
+                content=ft.Column([
+                    self.header,
+                    self.main_content,
+                ], spacing=0),
+                bgcolor=self.bg_color,
+                expand=True,
+            )
+        ]
+        self.expand = True
+    
+    def did_mount(self):
+        """Initialize window and check permissions - called automatically"""
+        self._check_and_request_permissions()
+        self._calculate_window_size(initial=True)
+        self.window_initialized = True
+    
+    def will_unmount(self):
+        """Clean up resources"""
+        self.stop_typing = True
+        if self.current_thread and self.current_thread.is_alive():
+            self.current_thread.join(timeout=1)
+    
+    # Rest of the methods remain the same (on_text_changed, paste_from_clipboard, etc.)
+    # Only change is remove the old build() method and use _build_ui() instead
     
     def on_text_changed(self, e):
         """Handle text changes without auto-positioning window"""
@@ -483,6 +412,7 @@ class AcheiriaApp(UserControl):
         self.current_thread.start()
         logger.info(f"started typing {len(text)} chars at {speed} wpm")
     
+
     def _typing_thread(self, text: str, countdown: int, speed: int):
         """Background typing thread"""
         try:
@@ -494,6 +424,7 @@ class AcheiriaApp(UserControl):
                     logger.info("cancelled during countdown")
                     return
                 
+                # FIXED: Use run_thread for regular functions, not run_task
                 self.page.run_thread(lambda i=i: self._update_status(
                     f" {i}s to put your cursor where you want to type"
                 ))
@@ -546,7 +477,7 @@ class AcheiriaApp(UserControl):
                     except:
                         logger.debug(f"skipped: {repr(char)}")
                 
-                # Update progress
+                # Update progress - FIXED: Use run_thread
                 if i % 20 == 0 or i == total - 1:
                     progress = (i + 1) / total
                     self.page.run_thread(lambda p=progress, c=i+1, t=total, s=speed:
@@ -555,7 +486,7 @@ class AcheiriaApp(UserControl):
                 # Natural typing delay
                 time.sleep(delay * (0.85 + 0.3 * ((i % 50) / 50)))
             
-            # Complete
+            # Complete - FIXED: Use run_thread
             final_time = time.time() - self.typing_start_time if self.typing_start_time else 0
             if not self.stop_typing:
                 logger.info(f"completed {total} chars in {final_time:.1f}s")
@@ -565,8 +496,10 @@ class AcheiriaApp(UserControl):
         
         except Exception as e:
             logger.error(f"typing error: {e}", exc_info=True)
+            # FIXED: Use run_thread for error handling
             self.page.run_thread(lambda: self._complete(False, f"error: {str(e)}"))
-    
+
+
     def _timer_update(self):
         """Update timer display while typing"""
         while self.is_typing and not self.stop_typing:
@@ -574,6 +507,7 @@ class AcheiriaApp(UserControl):
                 elapsed = time.time() - self.typing_start_time
                 remaining = max(0, self.estimated_duration - elapsed)
                 
+                # FIXED: Use run_thread for timer updates
                 self.page.run_thread(lambda e=elapsed, r=remaining: self._update_timer(e, r))
             
             time.sleep(0.5)
@@ -668,3 +602,76 @@ class AcheiriaApp(UserControl):
         self.status_text.value = message
         self.status_text.color = "#FF3B30" if is_error else self.oxblood_light
         self.update()
+    
+    def _calculate_window_size(self, initial=False):
+        """Calculate optimal window size based on content without auto-positioning"""
+        # Base height for fixed elements
+        base_height = 318
+        
+        # Text area height
+        line_height = 20
+        text_lines = len(self.text_input.value.split('\n')) if self.text_input.value else 1
+        visible_lines = min(3, text_lines)
+        text_area_height = visible_lines * line_height + 25
+        
+        if text_lines > 3:
+            text_area_height += 15
+        
+        total_height = base_height + text_area_height
+        
+        if initial:
+            self.page.window.width = 600
+            self.page.window.height = max(350, min(600, total_height))
+        else:
+            self.page.window.height = max(350, min(600, total_height))
+        
+        self.page.window.min_width = 500
+        self.page.window.min_height = 350
+        self.page.window.resizable = True
+        
+        if not self.window_initialized:
+            self.window_initialized = True
+        
+        self.page.update()
+    
+    def _check_and_request_permissions(self):
+        """Check and request accessibility permissions on macOS"""
+        if self.os_type == "Darwin" and HAS_PYNPUT:
+            try:
+                test = keyboard.Controller()
+                test.press(keyboard.Key.shift)
+                test.release(keyboard.Key.shift)
+                logger.info("accessibility permissions granted")
+            except Exception as e:
+                logger.warning(f"accessibility permissions needed: {e}")
+                self.page.run_thread(self._show_permission_dialog)
+    
+    def _show_permission_dialog(self):
+        """Show dialog requesting accessibility permissions"""
+        if self.os_type == "Darwin":
+            import subprocess
+            
+            def open_settings(e):
+                subprocess.run(['open', 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'])
+                dlg.open = False
+                self.page.update()
+            
+            dlg = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("accessibility permission required", weight=ft.FontWeight.BOLD, color=self.text_color),
+                content=ft.Column([
+                    ft.Text("acheiria needs accessibility permissions to type on your behalf.", size=13, color=self.text_color),
+                    ft.Text("\n1. click 'open settings' below", size=12, color=self.text_color),
+                    ft.Text("2. find and enable this app", size=12, color=self.text_color),
+                    ft.Text("3. restart acheiria", size=12, color=self.text_color),
+                ], tight=True, spacing=8),
+                bgcolor=self.card_bg,
+                actions=[
+                    ft.TextButton("cancel", on_click=lambda e: setattr(dlg, 'open', False) or self.page.update()),
+                    ft.ElevatedButton("open settings", on_click=open_settings, bgcolor=self.oxblood, color=self.text_color),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            self.page.dialog = dlg
+            dlg.open = True
+            self.page.update()

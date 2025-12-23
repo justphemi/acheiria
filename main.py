@@ -10,9 +10,6 @@ import time
 import threading
 from pathlib import Path
 
-
-
-
 # Get user's home directory for logs (writable in bundled apps)
 if getattr(sys, 'frozen', False):
     # Running as bundled app
@@ -22,7 +19,6 @@ if getattr(sys, 'frozen', False):
 else:
     # Running as script
     log_file = Path('acheiria.log')
-
 
 # Configure logging
 logging.basicConfig(
@@ -40,8 +36,17 @@ logger.info(f"Log file: {log_file}")
 logger.info("="*50)
 
 # Import our app module
-from app.ui import AcheiriaApp
-from app.config import ConfigManager
+try:
+    from app.ui import AcheiriaApp
+    from app.config import ConfigManager
+except ImportError as e:
+    logger.error(f"Import error: {e}")
+    logger.error("Make sure app/ui.py and app/config.py exist")
+    # Create a simple error UI
+    def main(page: ft.Page):
+        page.add(ft.Text(f"Import Error: {e}", color="red"))
+    ft.app(target=main)
+    sys.exit(1)
 
 def main(page: ft.Page):
     """
@@ -54,8 +59,6 @@ def main(page: ft.Page):
         
         # Configure the main window
         page.title = "acheiria: nuturing laziness in youths"
-        page.window.width = 580
-        page.window.height = 520
         page.window.resizable = True
         page.window.minimizable = True
         page.window.maximizable = True
@@ -68,8 +71,12 @@ def main(page: ft.Page):
         # Set window constraints
         page.window.min_width = 500
         page.window.max_width = 900
-        page.window.min_height = 480
+        page.window.min_height = 350
         page.window.max_height = 900
+        
+        # Set initial window size
+        page.window.width = 600
+        page.window.height = 480
         
         # Set window position and always on top from config
         if not config.get('first_run', False):
@@ -92,8 +99,8 @@ def main(page: ft.Page):
                     'y': page.window.top or 100
                 }
                 config_manager.save_config(config)
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Window move save error: {e}")
         
         # Monitor window position
         def monitor_window():
@@ -111,7 +118,7 @@ def main(page: ft.Page):
         monitor_thread = threading.Thread(target=monitor_window, daemon=True)
         monitor_thread.start()
         
-        # Update the page
+        # Update the page (use regular update, not update_async)
         page.update()
         
         logger.info("Acheiria acheiria: nuturing laziness in youths started successfully")
